@@ -1,0 +1,7 @@
+requests
+python-dotenv
+customtkinter
+beautifulsoup4
+fastapi
+uvicorn
+browser-cookie3
