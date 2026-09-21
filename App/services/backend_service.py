@@ -5,7 +5,7 @@ class BackendService:
 
     def __init__(
         self,
-        base_url="http://127.0.0.1:8000"
+        base_url="https://gamevault-qt6h.onrender.com"
     ):
         self.base_url = base_url.rstrip("/")
         self.timeout = (5, 30)
