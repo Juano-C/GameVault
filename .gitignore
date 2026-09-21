@@ -9,8 +9,9 @@ build/
 dist/
 
 data/
+*.db
 
 .vscode/
 .idea/
 
-*.db
+*.log

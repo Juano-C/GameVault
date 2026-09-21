@@ -3,8 +3,6 @@ from concurrent.futures import (
     as_completed
 )
 
-import time
-
 from models.game import Game
 
 
@@ -72,13 +70,6 @@ class SyncService:
                     )
                 )
 
-            # IMPORTANTE:
-            # El backend puede haber recibido
-            # una URL o un Steam ID.
-            #
-            # Para logros necesitamos el ID
-            # numérico que devuelve el backend.
-
             resolved_steam_id = (
                 backend_response.get(
                     "steam_id"
@@ -88,18 +79,24 @@ class SyncService:
             if resolved_steam_id:
                 steam_id = resolved_steam_id
 
-            steam_response = backend_response.get(
-                "games",
-                {}
+            steam_response = (
+                backend_response.get(
+                    "games",
+                    {}
+                )
             )
 
-            steam_games = steam_response.get(
-                "games",
-                []
+            steam_games = (
+                steam_response.get(
+                    "games",
+                    []
+                )
             )
 
             own_games = [
-                self._create_own_game_data(game)
+                self._create_own_game_data(
+                    game
+                )
                 for game in steam_games
             ]
 
@@ -111,7 +108,8 @@ class SyncService:
             if on_progress:
 
                 on_progress(
-                    f"{len(own_games)} juegos propios encontrados"
+                    f"{len(own_games)} "
+                    "juegos propios encontrados"
                 )
 
             # ------------------------------------------
@@ -154,8 +152,13 @@ class SyncService:
                 if on_progress:
 
                     on_progress(
-                        "Biblioteca familiar no configurada."
+                        "Biblioteca familiar "
+                        "no configurada."
                     )
+
+            # ------------------------------------------
+            # BUILD FAMILY GAMES
+            # ------------------------------------------
 
             family_games = []
 
@@ -187,11 +190,14 @@ class SyncService:
                     "exclude_reason",
                     0
                 ) != 0:
+
                     continue
 
-                playtime = family_playtime.get(
-                    int(app_id),
-                    {}
+                playtime = (
+                    family_playtime.get(
+                        int(app_id),
+                        {}
+                    )
                 )
 
                 family_games.append(
@@ -202,19 +208,43 @@ class SyncService:
                 )
 
             # ------------------------------------------
+            # FAMILY LAST 2 WEEKS
+            # ------------------------------------------
+
+            family_playtime_2weeks = (
+                self.database_service
+                .update_family_playtime_history(
+                    family_games
+                )
+            )
+
+            for game in family_games:
+
+                game["playtime_2weeks"] = (
+                    family_playtime_2weeks.get(
+                        game["app_id"],
+                        0
+                    )
+                )
+
+            # ------------------------------------------
             # SAVE
             # ------------------------------------------
 
             self.database_service.save_games(
                 [
-                    self._create_game_from_data(game)
+                    self._create_game_from_data(
+                        game
+                    )
                     for game in own_games
                 ]
             )
 
             self.database_service.save_family_games(
                 [
-                    self._create_game_from_data(game)
+                    self._create_game_from_data(
+                        game
+                    )
                     for game in family_games
                 ]
             )
@@ -241,13 +271,21 @@ class SyncService:
             # ACHIEVEMENTS
             # ------------------------------------------
 
+            all_games = (
+                own_games
+                + family_games
+            )
+
             new_app_ids = (
-                own_app_ids
+                {
+                    game["app_id"]
+                    for game in all_games
+                }
                 - existing_app_ids
             )
 
             self.sync_achievements(
-                own_games,
+                all_games,
                 steam_id,
                 new_app_ids,
                 on_progress
@@ -343,6 +381,7 @@ class SyncService:
         if rt_playtime is not None:
 
             try:
+
                 minutes = int(
                     rt_playtime
                 )
@@ -367,6 +406,7 @@ class SyncService:
         if rt_last_played:
 
             try:
+
                 last_played = int(
                     rt_last_played
                 )
@@ -376,14 +416,18 @@ class SyncService:
                 ValueError
             ):
 
-                last_played = playtime_data.get(
-                    "last_played"
+                last_played = (
+                    playtime_data.get(
+                        "last_played"
+                    )
                 )
 
         else:
 
-            last_played = playtime_data.get(
-                "last_played"
+            last_played = (
+                playtime_data.get(
+                    "last_played"
+                )
             )
 
         return {
@@ -461,36 +505,8 @@ class SyncService:
             for game in games
         }
 
-        cutoff = (
-            int(time.time())
-            - (
-                self.RECENT_DAYS
-                * 24
-                * 60
-                * 60
-            )
-        )
-
-        recent_ids = set()
-
-        for game in games:
-
-            last_played = game.get(
-                "last_played"
-            )
-
-            if (
-                last_played
-                and last_played >= cutoff
-            ):
-
-                recent_ids.add(
-                    game["app_id"]
-                )
-
-        candidate_ids = (
-            set(new_app_ids)
-            | recent_ids
+        candidate_ids = set(
+            games_by_id.keys()
         )
 
         ids_to_check = (
@@ -560,9 +576,11 @@ class SyncService:
                             0
                         )
 
-                        total_achievements = result.get(
-                            "total",
-                            0
+                        total_achievements = (
+                            result.get(
+                                "total",
+                                0
+                            )
                         )
 
                         self.database_service.update_achievements(
@@ -626,7 +644,8 @@ class SyncService:
             if on_progress:
 
                 on_progress(
-                    "No se pudieron obtener tus reseñas."
+                    "No se pudieron obtener "
+                    "tus reseñas."
                 )
 
             return
@@ -667,5 +686,6 @@ class SyncService:
         if on_progress:
 
             on_progress(
-                f"{len(reviews)} reseñas tuyas sincronizadas."
+                f"{len(reviews)} "
+                "reseñas tuyas sincronizadas."
             )

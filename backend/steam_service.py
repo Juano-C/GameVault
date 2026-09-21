@@ -1,8 +1,9 @@
 import os
 import re
+
 import requests
 
-from urllib.parse import quote, urlparse
+from urllib.parse import quote
 from dotenv import load_dotenv
 
 
@@ -16,7 +17,9 @@ class SteamService:
 
     def __init__(self):
 
-        self.api_key = os.getenv("STEAM_API_KEY")
+        self.api_key = os.getenv(
+            "STEAM_API_KEY"
+        )
 
         self.session = requests.Session()
 
@@ -31,7 +34,14 @@ class SteamService:
             )
         })
 
-    def get_owned_games(self, steam_id):
+    # ==================================================
+    # OWNED GAMES
+    # ==================================================
+
+    def get_owned_games(
+        self,
+        steam_id
+    ):
 
         url = (
             f"{self.BASE_URL}"
@@ -60,22 +70,60 @@ class SteamService:
             {}
         )
 
-    def resolve_custom_profile(self, custom_name):
+    # ==================================================
+    # RECENTLY PLAYED
+    # ==================================================
+
+    def get_recently_played_games(
+        self,
+        steam_id
+    ):
+
+        url = (
+            f"{self.BASE_URL}"
+            "/IPlayerService/"
+            "GetRecentlyPlayedGames/v0001/"
+        )
+
+        params = {
+            "key": self.api_key,
+            "steamid": steam_id,
+            "format": "json"
+        }
+
+        response = self.session.get(
+            url,
+            params=params,
+            timeout=self.TIMEOUT
+        )
+
+        response.raise_for_status()
+
+        return response.json().get(
+            "response",
+            {}
+        )
+
+    # ==================================================
+    # RESOLVE CUSTOM PROFILE
+    # ==================================================
+
+    def resolve_custom_profile(
+        self,
+        custom_name
+    ):
 
         custom_name = custom_name.strip()
 
         if not custom_name:
             return None
 
-        # ------------------------------------------
-        # STEAM WEB API
-        # ------------------------------------------
-
         try:
 
             url = (
                 f"{self.BASE_URL}"
-                "/ISteamUser/ResolveVanityURL/v0001/"
+                "/ISteamUser/"
+                "ResolveVanityURL/v0001/"
             )
 
             params = {
@@ -99,7 +147,9 @@ class SteamService:
 
             if result.get("success") == 1:
 
-                steam_id = result.get("steamid")
+                steam_id = result.get(
+                    "steamid"
+                )
 
                 if steam_id:
                     return steam_id
@@ -111,9 +161,9 @@ class SteamService:
                 error
             )
 
-        # ------------------------------------------
-        # PERFIL XML
-        # ------------------------------------------
+        # ----------------------------------------------
+        # XML
+        # ----------------------------------------------
 
         try:
 
@@ -145,9 +195,9 @@ class SteamService:
                 error
             )
 
-        # ------------------------------------------
-        # PERFIL HTML
-        # ------------------------------------------
+        # ----------------------------------------------
+        # PROFILE HTML
+        # ----------------------------------------------
 
         try:
 
@@ -189,42 +239,87 @@ class SteamService:
 
         return None
 
+    # ==================================================
+    # ACHIEVEMENTS
+    # ==================================================
+
     def get_game_achievements(
         self,
         steam_id,
         app_id
     ):
 
-        url = (
+        # ----------------------------------------------
+        # TOTAL ACHIEVEMENTS
+        # ----------------------------------------------
+
+        schema_url = (
+            f"{self.BASE_URL}"
+            "/ISteamUserStats/"
+            "GetSchemaForGame/v2/"
+        )
+
+        schema_params = {
+            "key": self.api_key,
+            "appid": app_id,
+            "format": "json"
+        }
+
+        schema_response = self.session.get(
+            schema_url,
+            params=schema_params,
+            timeout=self.TIMEOUT
+        )
+
+        schema_response.raise_for_status()
+
+        schema_data = schema_response.json()
+
+        achievements_schema = (
+            schema_data
+            .get("game", {})
+            .get("availableGameStats", {})
+            .get("achievements", [])
+        )
+
+        total = len(
+            achievements_schema
+        )
+
+        # ----------------------------------------------
+        # PLAYER ACHIEVEMENTS
+        # ----------------------------------------------
+
+        player_url = (
             f"{self.BASE_URL}"
             "/ISteamUserStats/"
             "GetPlayerAchievements/v0001/"
         )
 
-        params = {
+        player_params = {
             "key": self.api_key,
             "steamid": steam_id,
             "appid": app_id,
             "format": "json"
         }
 
-        response = self.session.get(
-            url,
-            params=params,
+        player_response = self.session.get(
+            player_url,
+            params=player_params,
             timeout=self.TIMEOUT
         )
 
-        response.raise_for_status()
+        player_response.raise_for_status()
 
-        data = response.json()
+        player_data = (
+            player_response.json()
+        )
 
         achievements = (
-            data
+            player_data
             .get("playerstats", {})
             .get("achievements", [])
         )
-
-        total = len(achievements)
 
         unlocked = sum(
             1
@@ -233,6 +328,10 @@ class SteamService:
         )
 
         return unlocked, total
+
+    # ==================================================
+    # REVIEWS
+    # ==================================================
 
     def get_user_reviews(
         self,
@@ -250,12 +349,6 @@ class SteamService:
                 f"https://store.steampowered.com/"
                 f"curator/{steam_id}"
             )
-
-            # Este método mantiene la compatibilidad
-            # con la implementación existente.
-            # Si tu SteamService ya tenía una
-            # implementación específica de reviews,
-            # reemplazaremos solamente este método.
 
             break
 

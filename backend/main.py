@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Query
 from fastapi.responses import RedirectResponse
+
 from urllib.parse import urlencode, urlparse
 
 from backend.steam_service import SteamService
@@ -10,10 +11,13 @@ app = FastAPI(
 )
 
 
-STEAM_OPENID_URL = "https://steamcommunity.com/openid/login"
+STEAM_OPENID_URL = (
+    "https://steamcommunity.com/openid/login"
+)
 
 RETURN_URL = (
-    "https://gamevault-qt6h.onrender.com/auth/steam/callback"
+    "https://gamevault-qt6h.onrender.com/"
+    "auth/steam/callback"
 )
 
 REALM = (
@@ -24,33 +28,29 @@ REALM = (
 steam_service = SteamService()
 
 
+# ==================================================
+# HOME
+# ==================================================
+
 @app.api_route(
     "/",
     methods=["GET", "HEAD"]
 )
 def home():
+
     return {
         "status": "ok",
-        "service": "Steam GameVault API",
-        "version": "diagnostic-1"
+        "service": "Steam GameVault API"
     }
 
 
-@app.get("/debug/routes")
-def debug_routes():
-    return {
-        "loaded_file": __file__,
-        "routes": [
-            {
-                "path": route.path,
-                "methods": list(route.methods or [])
-            }
-            for route in app.routes
-        ]
-    }
+# ==================================================
+# RESOLVE STEAM ID
+# ==================================================
 
-
-def resolve_steam_id(value):
+def resolve_steam_id(
+    value
+):
 
     if not value:
         return None
@@ -60,18 +60,26 @@ def resolve_steam_id(value):
     if value.isdigit():
         return value
 
-    if not value.startswith(("http://", "https://")):
+    if not value.startswith(
+        ("http://", "https://")
+    ):
         value = "https://" + value
 
     try:
-        parsed = urlparse(value)
+
+        parsed = urlparse(
+            value
+        )
+
     except Exception:
+
         return None
 
     if parsed.netloc.lower() not in (
         "steamcommunity.com",
         "www.steamcommunity.com"
     ):
+
         return None
 
     parts = (
@@ -83,8 +91,15 @@ def resolve_steam_id(value):
     if len(parts) < 2:
         return None
 
-    profile_type = parts[0].lower()
+    profile_type = (
+        parts[0].lower()
+    )
+
     profile_value = parts[1]
+
+    # ----------------------------------------------
+    # /profiles/765611...
+    # ----------------------------------------------
 
     if profile_type == "profiles":
 
@@ -93,16 +108,29 @@ def resolve_steam_id(value):
 
         return None
 
+    # ----------------------------------------------
+    # /id/nombre
+    # ----------------------------------------------
+
     if profile_type == "id":
 
-        return steam_service.resolve_custom_profile(
-            profile_value
+        return (
+            steam_service
+            .resolve_custom_profile(
+                profile_value
+            )
         )
 
     return None
 
 
-@app.get("/steam/games")
+# ==================================================
+# OWNED GAMES
+# ==================================================
+
+@app.get(
+    "/steam/games"
+)
 def get_games(
     steam_input: str = Query(...)
 ):
@@ -116,15 +144,18 @@ def get_games(
         return {
             "success": False,
             "error": (
-                "No se pudo convertir la URL "
-                "o Steam ID proporcionado."
+                "No se pudo convertir "
+                "la URL o Steam ID proporcionado."
             )
         }
 
     try:
 
-        games = steam_service.get_owned_games(
-            steam_id
+        games = (
+            steam_service
+            .get_owned_games(
+                steam_id
+            )
         )
 
         return {
@@ -141,7 +172,46 @@ def get_games(
         }
 
 
-@app.get("/steam/achievements")
+# ==================================================
+# RECENTLY PLAYED
+# ==================================================
+
+@app.get(
+    "/steam/recently-played"
+)
+def get_recently_played(
+    steam_id: str = Query(...)
+):
+
+    try:
+
+        games = (
+            steam_service
+            .get_recently_played_games(
+                steam_id
+            )
+        )
+
+        return {
+            "success": True,
+            "games": games
+        }
+
+    except Exception as error:
+
+        return {
+            "success": False,
+            "error": str(error)
+        }
+
+
+# ==================================================
+# ACHIEVEMENTS
+# ==================================================
+
+@app.get(
+    "/steam/achievements"
+)
 def get_achievements(
     steam_id: str = Query(...),
     app_id: int = Query(...)
@@ -171,32 +241,60 @@ def get_achievements(
         }
 
 
-@app.get("/auth/steam")
+# ==================================================
+# STEAM LOGIN
+# ==================================================
+
+@app.get(
+    "/auth/steam"
+)
 def steam_login():
 
     params = {
+
         "openid.ns": (
-            "http://specs.openid.net/auth/2.0"
+            "http://specs.openid.net/"
+            "auth/2.0"
         ),
-        "openid.mode": "checkid_setup",
-        "openid.return_to": RETURN_URL,
-        "openid.realm": REALM,
+
+        "openid.mode": (
+            "checkid_setup"
+        ),
+
+        "openid.return_to": (
+            RETURN_URL
+        ),
+
+        "openid.realm": (
+            REALM
+        ),
+
         "openid.identity": (
-            "http://specs.openid.net/auth/2.0/"
+            "http://specs.openid.net/"
+            "auth/2.0/"
             "identifier_select"
         ),
+
         "openid.claimed_id": (
-            "http://specs.openid.net/auth/2.0/"
+            "http://specs.openid.net/"
+            "auth/2.0/"
             "identifier_select"
         )
     }
 
     return RedirectResponse(
-        f"{STEAM_OPENID_URL}?{urlencode(params)}"
+        f"{STEAM_OPENID_URL}?"
+        f"{urlencode(params)}"
     )
 
 
-@app.get("/auth/steam/callback")
+# ==================================================
+# STEAM LOGIN CALLBACK
+# ==================================================
+
+@app.get(
+    "/auth/steam/callback"
+)
 def steam_callback(
     claimed_id: str = Query(
         ...,
@@ -212,7 +310,10 @@ def steam_callback(
 
         return {
             "success": False,
-            "error": "No se pudo obtener el Steam ID."
+            "error": (
+                "No se pudo obtener "
+                "el Steam ID."
+            )
         }
 
     return {
@@ -221,7 +322,13 @@ def steam_callback(
     }
 
 
-def extract_steam_id(claimed_id):
+# ==================================================
+# EXTRACT STEAM ID
+# ==================================================
+
+def extract_steam_id(
+    claimed_id
+):
 
     if not claimed_id:
         return None
