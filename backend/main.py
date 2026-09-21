@@ -13,11 +13,11 @@ app = FastAPI(
 STEAM_OPENID_URL = "https://steamcommunity.com/openid/login"
 
 RETURN_URL = (
-    "https://gamevault-tq6h.onrender.com/auth/steam/callback"
+    "https://gamevault-qt6h.onrender.com/auth/steam/callback"
 )
 
 REALM = (
-    "https://gamevault-tq6h.onrender.com/"
+    "https://gamevault-qt6h.onrender.com/"
 )
 
 
